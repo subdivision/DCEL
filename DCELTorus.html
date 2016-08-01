@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <title>Torus example</title>
+  <meta charset="utf-8">
+  <meta name="viewport"
+        content="width=device-width,
+           user-scalable=no,
+           minimum-scale=1.0,
+           maximum-scale=1.0">
+</head>
+<body>
+<table>
+  <tr>
+    <td style='color:red'>
+     Sin(X)
+    </td>
+    <td style="padding:15px">
+      Average Delta
+    </td>
+    <td>
+      Maximal Delta
+    </td>
+  </tr>
+  <tr>
+    <td style='background-color: blue; color: white'>
+      Circle Average
+    </td>
+    <td id='circ_avg' style="padding:15px"> 0
+    </td>
+    <td id='circ_max'> 0
+    </td>
+  </tr>
+  <tr>
+    <td style='background-color: green; color: white'>
+      Classic Average
+    </td>
+    <td id='classic_avg' style="padding:15px"> 0
+    </td>
+    <td id='classic_max'> 0
+    </td>
+  </tr>
+</table>
+
+<script src="Three.min.js"></script>
+<script src="Detector.js"></script>
+<script src="OrbitControls.js"></script>
+<script src="dat.gui.min.js"></script>
+<script src="THREEx.FullScreen.js"></script>
+<script src="THREEx.WindowResize.js"></script>
+<script src="DCELIdGenerator.js"></script>
+<script src="DCELCore.js"></script>
+<script src="DCELInit.js"></script>
+<script src="DCELSubdLR.js"></script>
+<script src="CSubd3D.js"></script>
+
+<div id="ThreeJS" align='center' style="z-index: 1;"></div>
+
+
+<!-- ---------------------------------------------  -->
+
+<script>
+// MAIN
+Array.prototype.extend = function(other_array)
+{
+  other_array.forEach(function(v) {this.push(v)}, this);
+}
+
+// standard global variables
+var container, scene, camera, renderer, controls;
+
+var params = function()
+{
+  this.iter = 1;
+  this.segm = 4;
+};
+var prms;
+
+var CurrMeshSize = 4;
+var NumOfIterations = 1;
+
+var OrigMesh;
+var OrigMeshEdgeColor;
+var OrigNormalsColor;
+
+var ResultMesh;
+var ResultMeshEdgeColor;
+
+var ClassicMesh;
+var ClassicMeshEdgeColor;
+
+init();
+animate();
+
+// FUNCTIONS
+function init()
+{
+  // SCENE
+  scene = new THREE.Scene();
+  // CAMERA
+  var SCREEN_WIDTH = window.innerWidth * 0.96;
+  var SCREEN_HEIGHT = window.innerHeight * 0.8;
+  var VIEW_ANGLE = 45;
+  var ASPECT = SCREEN_WIDTH / SCREEN_HEIGHT;
+  var NEAR = 0.1;
+  var FAR = 20000;
+  camera = new THREE.PerspectiveCamera( VIEW_ANGLE, ASPECT, NEAR, FAR);
+  scene.add(camera);
+  camera.position.set(10,-40,30);
+  camera.lookAt(scene.position);
+  // RENDERER
+  renderer = new THREE.WebGLRenderer("highp");
+  renderer.setClearColor( 0xEEEEEE, 1 );
+  renderer.shadowMapEnabled = true;
+  renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT );
+  container = document.getElementById( 'ThreeJS' );
+  container.appendChild( renderer.domElement );
+  // EVENTS
+  THREEx.WindowResize(renderer, camera);
+  THREEx.FullScreen.bindKey({ charCode : 'm'.charCodeAt(0) });
+  // CONTROLS
+  controls = new THREE.OrbitControls( camera, renderer.domElement );
+  // LIGHT
+  var light = new THREE.PointLight(0xffffff);
+  light.position.set(100,250,100);
+  scene.add(light);
+
+  prms = new params();
+  var gui = new dat.GUI();
+  gui.add( prms, 'iter' ).min(1).max(4).step(1).onFinishChange(update);
+  gui.add( prms, 'segm' ).min(3).max(9).step(1).onFinishChange(update);
+
+
+  // GEOMETRY
+  OrigMeshEdgeColor = new THREE.Color(0x000000); //0xD0A9F5 );
+  OrigNormalsColor = new THREE.Color(0x000000);
+  ResultMeshEdgeColor = new THREE.Color(0x0000FF );
+  ClassicMeshEdgeColor = new THREE.Color(0x00FF00 );
+  scene.add( new THREE.AxisHelper(15) );
+}
+
+//----------------------------------------------------------------------------
+function performAlgorithm()
+{
+  OrigMesh = DCEL.createTorus(CurrMeshSize);
+  ResultMesh = DCEL.performLaneRiesenfeld(OrigMesh,
+                                          NumOfIterations,
+                                          computeCircleAverage);
+  ClassicMesh = DCEL.performLaneRiesenfeld(OrigMesh,
+                                          NumOfIterations,
+                                          computeClassicAverage);
+}
+
+//----------------------------------------------------------------------------
+function publishStatistics( Stats )
+{
+  document.getElementById('circ_avg').innerHTML = Stats[0];
+  document.getElementById('circ_max').innerHTML = Stats[1];
+  document.getElementById('classic_avg').innerHTML = Stats[2];
+  document.getElementById('classic_max').innerHTML = Stats[3];
+}
+
+//----------------------------------------------------------------------------
+function animate()
+{
+  render();
+  update();
+}
+
+//----------------------------------------------------------------------------
+function update()
+{
+  if(OrigMesh !== undefined)
+    OrigMesh.hide(scene);
+  if(ResultMesh !== undefined)
+    ResultMesh.hide(scene);
+  if(ClassicMesh !== undefined)
+    ClassicMesh.hide(scene);
+
+  CurrMeshSize = prms.segm;
+  NumOfIterations = prms.iter;
+  performAlgorithm();
+
+  if(OrigMesh != undefined)
+    OrigMesh.display(scene, OrigMeshEdgeColor, false); // OrigNormalsColor, true);
+  if(ResultMesh != undefined)
+    ResultMesh.display(scene, ResultMeshEdgeColor, false);
+                       //ResultMeshEdgeColor, true );
+  if(ClassicMesh != undefined)
+    ClassicMesh.display(scene, ClassicMeshEdgeColor, false);
+                       //ResultMeshEdgeColor, true );
+
+  //render();
+  controls.update();
+}
+
+//----------------------------------------------------------------------------
+function render()
+{
+  requestAnimationFrame(render);
+  renderer.render(scene, camera);
+}
+
+</script>
+</body>
+</html>
+
